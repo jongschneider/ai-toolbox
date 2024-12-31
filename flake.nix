@@ -7,10 +7,14 @@
     git-hooks-nix.url = "github:cachix/git-hooks.nix";
   };
 
-  outputs = inputs @ {flake-parts, ...}:
+  outputs = inputs @ {
+    flake-parts,
+    git-hooks-nix,
+    ...
+  }:
     flake-parts.lib.mkFlake {inherit inputs;} {
       imports = [
-        inputs.git-hooks-nix.flakeModule
+        git-hooks-nix.flakeModule
       ];
       systems = ["x86_64-linux" "aarch64-linux" "aarch64-darwin" "x86_64-darwin"];
 
@@ -20,12 +24,14 @@
         pkgs,
         ...
       }: let
+        # version = "latest";
+        vendorHash = "sha256-z5SVcJSzeHnFijBOLIJMbHShT/P5f2uQ3SIZzyrUtVI="; # update whenever go.mod changes
         buildTool = name:
           pkgs.buildGoModule {
-            pname = name;
-            version = "0.1.0";
-            src = ./tools/${name};
-            vendorHash = null;
+            inherit name vendorHash;
+            src = ./.;
+            subPackages = ["tools/${name}"];
+            proxyVendor = true;
           };
       in {
         # Packages
@@ -57,10 +63,21 @@
         pre-commit.settings.hooks = {
           alejandra.enable = true;
           gofmt.enable = true;
+          golines.enable = true;
           golangci-lint.enable = true;
           govet.enable = true;
+          staticcheck.enable = true;
           deadnix.enable = true;
+          statix.enable = true;
           trim-trailing-whitespace.enable = true;
+          check-yaml.enable = true;
+          yamlfmt.enable = true;
+          fix-byte-order-marker.enable = true;
+          flake-checker.enable = true;
+          markdownlint.enable = true;
+          prettier.enable = true;
+          ripsecrets.enable = true;
+          shellcheck.enable = true;
         };
 
         formatter = pkgs.alejandra;
