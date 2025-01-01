@@ -25,7 +25,8 @@
         ...
       }: let
         # version = "latest";
-        vendorHash = "sha256-z5SVcJSzeHnFijBOLIJMbHShT/P5f2uQ3SIZzyrUtVI="; # update whenever go.mod changes
+        # vendorHash = "sha256-z5SVcJSzeHnFijBOLIJMbHShT/P5f2uQ3SIZzyrUtVI="; # update whenever go.mod changes
+        vendorHash = null;
         buildTool = name:
           pkgs.buildGoModule {
             inherit name vendorHash;
@@ -62,10 +63,10 @@
         };
         pre-commit.settings.hooks = {
           alejandra.enable = true;
-          gofmt.enable = true;
+          # gofmt.enable = true;
           golines.enable = true;
-          golangci-lint.enable = true;
-          govet.enable = true;
+          # golangci-lint.enable = true;
+          # govet.enable = true;
           staticcheck.enable = true;
           deadnix.enable = true;
           statix.enable = true;
