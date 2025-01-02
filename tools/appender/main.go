@@ -13,6 +13,7 @@ type FileNode struct {
 	name     string
 	path     string
 	isDir    bool
+	isRoot   bool
 	expanded bool
 	selected bool
 	children []*FileNode
@@ -36,6 +37,7 @@ func buildFileTree(path string, isRoot bool) (*FileNode, error) {
 		name:     info.Name(),
 		path:     path,
 		isDir:    info.IsDir(),
+		isRoot:   isRoot,
 		expanded: true,
 		selected: false,
 	}
@@ -80,7 +82,7 @@ func (m *model) flattenNode(node *FileNode, prefix string, isLast bool) {
 	}
 
 	for i, child := range node.children {
-		newPrefix := prefix
+		newPrefix := strings.Repeat(" ", len(prefix))
 		if i == len(node.children)-1 {
 			m.flattenNode(child, newPrefix+"└──", true)
 		} else {
@@ -92,17 +94,17 @@ func (m *model) flattenNode(node *FileNode, prefix string, isLast bool) {
 func (m *model) getNodeLine(node *FileNode) string {
 	prefix := m.linePrefix[node]
 	dirIndicator := ""
-	if node.isDir {
+	if node.isDir && !node.isRoot {
 		if node.expanded {
-			dirIndicator = "󱞣 "
+			dirIndicator = " "
 		} else {
-			dirIndicator = " "
+			dirIndicator = " "
 		}
 	}
 
 	selected := ""
 	if node.selected {
-		selected = " "
+		selected = "  "
 	}
 
 	return fmt.Sprintf("%s%s%s%s", prefix, dirIndicator, node.name, selected)
