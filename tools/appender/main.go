@@ -1,3 +1,4 @@
+//nolint:forbidigo
 package main
 
 import (
@@ -16,6 +17,7 @@ type FileNode struct {
 	isRoot   bool
 	expanded bool
 	selected bool
+	prefix   string
 	children []*FileNode
 }
 
@@ -25,6 +27,92 @@ type model struct {
 	cursor     int
 	flatNodes  []*FileNode
 	linePrefix map[*FileNode]string
+}
+
+func buildFileTree2(path, indent string, isRoot bool) (*FileNode, error) {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return nil, fmt.Errorf("stat %s: %w", path, err)
+	}
+
+	node := &FileNode{
+		name:     fi.Name(),
+		path:     path,
+		isDir:    fi.IsDir(),
+		isRoot:   isRoot,
+		expanded: true,
+		selected: false,
+		prefix:   indent,
+	}
+
+	if !node.isDir {
+		return node, nil
+	}
+
+	dir, err := os.Open(path)
+	if err != nil {
+		return node, fmt.Errorf("open %s: %w", path, err)
+	}
+	names, err := dir.Readdirnames(-1)
+	_ = dir.Close() // safe to ignore this error.
+	if err != nil {
+		return node, fmt.Errorf("read dir names %s: %w", path, err)
+	}
+
+	names = removeHidden(names)
+	// sort.Sort(caseInsensitive{names})
+	add := "│   "
+	for i, name := range names {
+		dirPath := filepath.Join(path, name)
+		childNode := &FileNode{
+			name:     name,
+			path:     dirPath,
+			isDir:    true,
+			isRoot:   false,
+			expanded: false,
+			selected: false,
+		}
+
+		entries, err := os.ReadDir(dirPath)
+		if err != nil {
+			if !strings.Contains(err.Error(), "not a directory") {
+				return nil, err
+			}
+
+			childNode.isDir = false
+		}
+
+		if i == len(names)-1 {
+			fmt.Println("🚨", name)
+			childNode.prefix = indent + "└── "
+			add += "    "
+		} else {
+			fmt.Println("✅", name)
+			childNode.prefix = indent + "├── "
+		}
+
+		for _, entry := range entries {
+			childPath := filepath.Join(path, name, entry.Name())
+			fmt.Printf("🔥 1 %q\n", indent+add)
+			n, err := buildFileTree2(childPath, indent+add, false)
+			if err != nil || n == nil {
+				continue
+			}
+			fmt.Println("🔥 3", n.prefix, n.name)
+			childNode.children = append(childNode.children, n)
+		}
+
+		fmt.Println("🔥 4", childNode.prefix, childNode.name)
+		node.children = append(node.children, childNode)
+		// childNode, err := buildFileTree(path string, isRoot bool)
+		// node.children = append(node.children, )
+		// d, f, err := visit(filepath.Join(path, name), indent+add, w)
+		// if err != nil {
+		// 	log.Println(err)
+		// }
+	}
+
+	return node, nil
 }
 
 func buildFileTree(path string, isRoot bool) (*FileNode, error) {
@@ -45,7 +133,7 @@ func buildFileTree(path string, isRoot bool) (*FileNode, error) {
 	if isRoot {
 		node.name = "."
 	} else if strings.HasPrefix(node.name, ".") {
-		return nil, nil
+		return nil, nil //nolint:nilnil
 	}
 
 	if node.isDir {
@@ -70,10 +158,10 @@ func buildFileTree(path string, isRoot bool) (*FileNode, error) {
 func (m *model) flattenTree() {
 	m.flatNodes = make([]*FileNode, 0)
 	m.linePrefix = make(map[*FileNode]string)
-	m.flattenNode(m.rootNode, "", true)
+	m.flattenNode(m.rootNode, "")
 }
 
-func (m *model) flattenNode(node *FileNode, prefix string, isLast bool) {
+func (m *model) flattenNode(node *FileNode, prefix string) {
 	m.flatNodes = append(m.flatNodes, node)
 	m.linePrefix[node] = prefix
 
@@ -84,9 +172,9 @@ func (m *model) flattenNode(node *FileNode, prefix string, isLast bool) {
 	for i, child := range node.children {
 		newPrefix := strings.Repeat(" ", len(prefix))
 		if i == len(node.children)-1 {
-			m.flattenNode(child, newPrefix+"└──", true)
+			m.flattenNode(child, newPrefix+"└──")
 		} else {
-			m.flattenNode(child, newPrefix+"├──", false)
+			m.flattenNode(child, newPrefix+"├──")
 		}
 	}
 }
@@ -96,9 +184,9 @@ func (m *model) getNodeLine(node *FileNode) string {
 	dirIndicator := ""
 	if node.isDir && !node.isRoot {
 		if node.expanded {
-			dirIndicator = " "
-		} else {
 			dirIndicator = " "
+		} else {
+			dirIndicator = " "
 		}
 	}
 
@@ -110,12 +198,12 @@ func (m *model) getNodeLine(node *FileNode) string {
 	return fmt.Sprintf("%s%s%s%s", prefix, dirIndicator, node.name, selected)
 }
 
-func (m model) Init() tea.Cmd {
+func (m *model) Init() tea.Cmd {
 	return nil
 }
 
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
+func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) { //nolint:gocritic
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "q":
@@ -160,7 +248,7 @@ func (m *model) toggleDirSelection(node *FileNode) {
 	}
 }
 
-func (m model) View() string {
+func (m *model) View() string {
 	var s strings.Builder
 
 	for i, node := range m.flatNodes {
@@ -194,7 +282,7 @@ func (m *model) collectSelectedFiles(node *FileNode, output *strings.Builder) {
 		relPath, _ := filepath.Rel(m.workDir, node.path)
 		content, err := os.ReadFile(node.path)
 		if err == nil {
-			output.WriteString(fmt.Sprintf("# %s\n%s\n", relPath, string(content)))
+			fmt.Fprintf(output, "# %s\n%s\n", relPath, string(content))
 		}
 	}
 
