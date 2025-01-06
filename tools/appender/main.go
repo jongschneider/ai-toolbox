@@ -11,176 +11,17 @@ import (
 )
 
 type FileNode struct {
-	name     string
-	path     string
-	isDir    bool
-	isRoot   bool
-	expanded bool
+	name     string // name represents the name of the file or directory
+	path     string // path represents the full path of the file or directory
+	isDir    bool   // isDir is used to identify directories
+	isRoot   bool   // isRoot is only used to identify the root node.
+	expanded bool   // expanded is used to show/hide the children of a directory
 	selected bool
-	prefix   string
-	children []*FileNode
+	prefix   string      // prefix is used in the View method to draw the tree structure
+	children []*FileNode // includes directories and files
 }
 
-type model struct {
-	workDir    string
-	rootNode   *FileNode
-	cursor     int
-	flatNodes  []*FileNode
-	linePrefix map[*FileNode]string
-}
-
-func buildFileTree2(path, indent string, isRoot bool) (*FileNode, error) {
-	fi, err := os.Stat(path)
-	if err != nil {
-		return nil, fmt.Errorf("stat %s: %w", path, err)
-	}
-
-	node := &FileNode{
-		name:     fi.Name(),
-		path:     path,
-		isDir:    fi.IsDir(),
-		isRoot:   isRoot,
-		expanded: true,
-		selected: false,
-		prefix:   indent,
-	}
-
-	if !node.isDir {
-		return node, nil
-	}
-
-	dir, err := os.Open(path)
-	if err != nil {
-		return node, fmt.Errorf("open %s: %w", path, err)
-	}
-	names, err := dir.Readdirnames(-1)
-	_ = dir.Close() // safe to ignore this error.
-	if err != nil {
-		return node, fmt.Errorf("read dir names %s: %w", path, err)
-	}
-
-	names = removeHidden(names)
-	// sort.Sort(caseInsensitive{names})
-	add := "│   "
-	for i, name := range names {
-		dirPath := filepath.Join(path, name)
-		childNode := &FileNode{
-			name:     name,
-			path:     dirPath,
-			isDir:    true,
-			isRoot:   false,
-			expanded: false,
-			selected: false,
-		}
-
-		entries, err := os.ReadDir(dirPath)
-		if err != nil {
-			if !strings.Contains(err.Error(), "not a directory") {
-				return nil, err
-			}
-
-			childNode.isDir = false
-		}
-
-		if i == len(names)-1 {
-			fmt.Println("🚨", name)
-			childNode.prefix = indent + "└── "
-			add += "    "
-		} else {
-			fmt.Println("✅", name)
-			childNode.prefix = indent + "├── "
-		}
-
-		for _, entry := range entries {
-			childPath := filepath.Join(path, name, entry.Name())
-			fmt.Printf("🔥 1 %q\n", indent+add)
-			n, err := buildFileTree2(childPath, indent+add, false)
-			if err != nil || n == nil {
-				continue
-			}
-			fmt.Println("🔥 3", n.prefix, n.name)
-			childNode.children = append(childNode.children, n)
-		}
-
-		fmt.Println("🔥 4", childNode.prefix, childNode.name)
-		node.children = append(node.children, childNode)
-		// childNode, err := buildFileTree(path string, isRoot bool)
-		// node.children = append(node.children, )
-		// d, f, err := visit(filepath.Join(path, name), indent+add, w)
-		// if err != nil {
-		// 	log.Println(err)
-		// }
-	}
-
-	return node, nil
-}
-
-func buildFileTree(path string, isRoot bool) (*FileNode, error) {
-	info, err := os.Stat(path)
-	if err != nil {
-		return nil, err
-	}
-
-	node := &FileNode{
-		name:     info.Name(),
-		path:     path,
-		isDir:    info.IsDir(),
-		isRoot:   isRoot,
-		expanded: true,
-		selected: false,
-	}
-
-	if isRoot {
-		node.name = "."
-	} else if strings.HasPrefix(node.name, ".") {
-		return nil, nil //nolint:nilnil
-	}
-
-	if node.isDir {
-		entries, err := os.ReadDir(path)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, entry := range entries {
-			childPath := filepath.Join(path, entry.Name())
-			childNode, err := buildFileTree(childPath, false)
-			if err != nil || childNode == nil {
-				continue
-			}
-			node.children = append(node.children, childNode)
-		}
-	}
-
-	return node, nil
-}
-
-func (m *model) flattenTree() {
-	m.flatNodes = make([]*FileNode, 0)
-	m.linePrefix = make(map[*FileNode]string)
-	m.flattenNode(m.rootNode, "")
-}
-
-func (m *model) flattenNode(node *FileNode, prefix string) {
-	m.flatNodes = append(m.flatNodes, node)
-	m.linePrefix[node] = prefix
-
-	if !node.isDir || !node.expanded {
-		return
-	}
-
-	for i, child := range node.children {
-		newPrefix := strings.Repeat(" ", len(prefix))
-		if i == len(node.children)-1 {
-			m.flattenNode(child, newPrefix+"└──")
-		} else {
-			m.flattenNode(child, newPrefix+"├──")
-		}
-	}
-}
-
-func (m *model) getNodeLine(node *FileNode) string {
-	prefix := m.linePrefix[node]
+func (node *FileNode) String() string {
 	dirIndicator := ""
 	if node.isDir && !node.isRoot {
 		if node.expanded {
@@ -195,7 +36,37 @@ func (m *model) getNodeLine(node *FileNode) string {
 		selected = "  "
 	}
 
-	return fmt.Sprintf("%s%s%s%s", prefix, dirIndicator, node.name, selected)
+	return fmt.Sprintf("%s%s%s%s", node.prefix, dirIndicator, node.name, selected)
+}
+
+type model struct {
+	workDir   string
+	rootNode  *FileNode
+	cursor    int
+	flatNodes []*FileNode
+}
+
+func buildFileTree(path string, removeHidden bool) (*FileNode, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, err
+	}
+
+	node := &FileNode{
+		name:     info.Name(),
+		path:     path,
+		isDir:    info.IsDir(),
+		isRoot:   true,
+		expanded: true,
+		selected: false,
+	}
+
+	err = visitNode(node, "", removeHidden)
+	return node, err
+}
+
+func (m *model) flattenTree() {
+	m.flatNodes = m.rootNode.flatten()
 }
 
 func (m *model) Init() tea.Cmd {
@@ -252,7 +123,7 @@ func (m *model) View() string {
 	var s strings.Builder
 
 	for i, node := range m.flatNodes {
-		line := m.getNodeLine(node)
+		line := node.String()
 		if i == m.cursor {
 			line = "> " + line
 		} else {
@@ -308,6 +179,7 @@ func main() {
 		rootNode: rootNode,
 		cursor:   0,
 	}
+
 	initialModel.flattenTree()
 
 	p := tea.NewProgram(initialModel)

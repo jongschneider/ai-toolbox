@@ -65,8 +65,8 @@
           alejandra.enable = true;
           # gofmt.enable = true;
           golines.enable = true;
-          # golangci-lint.enable = true;
-          # govet.enable = true;
+          golangci-lint.enable = true;
+          govet.enable = true;
           staticcheck.enable = true;
           deadnix.enable = true;
           statix.enable = true;

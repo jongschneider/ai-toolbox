@@ -1,41 +1,44 @@
 package main
 
 import (
-	"os"
+	"fmt"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
-func Test_visit(t *testing.T) {
+func Test_visitNode(t *testing.T) {
 	tests := []struct {
-		name      string
-		path      string
-		indent    string
-		wantDirs  int
-		wantFiles int
-		wantErr   bool
+		name   string
+		node   *FileNode
+		prefix string
+		expect func(t *testing.T, node *FileNode, err error)
 	}{
 		{
-			name:      "testdata",
-			path:      "./testdata",
-			indent:    "",
-			wantDirs:  0,
-			wantFiles: 0,
-			wantErr:   false,
+			name: "./testdata",
+			node: &FileNode{
+				name:     "./testdata",
+				path:     "./testdata",
+				isDir:    true,
+				isRoot:   true,
+				expanded: true,
+			},
+			prefix: "",
+			expect: func(t *testing.T, node *FileNode, err error) {
+				t.Helper()
+				require.NoError(t, err)
+			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			w := os.Stdout
-			gotDirs, gotFiles, err := visit(tt.path, tt.indent, w)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("visit() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if gotDirs != tt.wantDirs {
-				t.Errorf("visit() gotDirs = %v, want %v", gotDirs, tt.wantDirs)
-			}
-			if gotFiles != tt.wantFiles {
-				t.Errorf("visit() gotFiles = %v, want %v", gotFiles, tt.wantFiles)
+			err := visitNode(tt.node, tt.prefix, true)
+			tt.expect(t, tt.node, err)
+
+			nodes := tt.node.flatten()
+
+			for _, n := range nodes {
+				fmt.Println(n.String()) //nolint:forbidigo
 			}
 		})
 	}

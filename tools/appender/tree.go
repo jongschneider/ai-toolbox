@@ -1,82 +1,81 @@
 package main
 
 import (
-	"fmt"
-	"io"
 	"log"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 )
 
-type caseInsensitive struct {
-	values []string
-}
-
-func (ci caseInsensitive) Len() int {
-	return len(ci.values)
-}
-
-func (ci caseInsensitive) Less(i, j int) bool {
-	return strings.ToLower(ci.values[i]) < strings.ToLower(ci.values[j])
-}
-
-func (ci caseInsensitive) Swap(i, j int) {
-	ci.values[i], ci.values[j] = ci.values[j], ci.values[i]
-}
-
-func visit(path, indent string, w io.Writer) (dirs, files int, err error) {
-	fi, err := os.Stat(path)
+func visitNode(node *FileNode, prefix string, removeHidden bool) error {
+	// Read directory contents
+	entries, err := os.ReadDir(node.path)
 	if err != nil {
-		return 0, 0, fmt.Errorf("stat %s: %w", path, err)
+		log.Printf("Error reading directory %s: %v", node.path, err)
+		return nil // Continue despite error
 	}
 
-	if _, err := w.Write([]byte(fi.Name() + "\n")); err != nil {
-		return 0, 0, fmt.Errorf("write %s: %w", fi.Name(), err)
-	}
-	if !fi.IsDir() {
-		return 0, 1, nil
-	}
+	// Process each entry in the directory
+	for i, entry := range entries {
+		if removeHidden && strings.HasPrefix(entry.Name(), ".") {
+			continue
+		}
 
-	dir, err := os.Open(path)
-	if err != nil {
-		return 1, 0, fmt.Errorf("open %s: %w", path, err)
-	}
-	names, err := dir.Readdirnames(-1)
-	_ = dir.Close() // safe to ignore this error.
-	if err != nil {
-		return 1, 0, fmt.Errorf("read dir names %s: %w", path, err)
-	}
-	names = removeHidden(names)
-	sort.Sort(caseInsensitive{names})
-	add := "│   "
-	for i, name := range names {
-		if i == len(names)-1 {
-			if _, err := w.Write([]byte(indent + "└── ")); err != nil {
-				return 0, 0, fmt.Errorf("write %s: %w", name, err)
+		isLast := i == len(entries)-1
+
+		// Create child node
+		childPath := filepath.Join(node.path, entry.Name())
+		childNode := &FileNode{
+			name:     entry.Name(),
+			path:     childPath,
+			isDir:    entry.IsDir(),
+			prefix:   buildPrefix(prefix, isLast),
+			expanded: true,
+		}
+
+		// Add child to parent's children
+		node.children = append(node.children, childNode)
+
+		// If it's a directory, recursively visit it
+		if childNode.isDir {
+			// Calculate new prefix for children of this directory
+			newPrefix := prefix
+			if isLast {
+				newPrefix += "    " // 4 spaces for alignment when last item
+			} else {
+				newPrefix += "│   " // vertical line + 3 spaces for non-last items
 			}
-			add = "    "
-		} else {
-			if _, err := w.Write([]byte(indent + "├── ")); err != nil {
-				return 0, 0, fmt.Errorf("write %s: %w", name, err)
+
+			if err := visitNode(childNode, newPrefix, removeHidden); err != nil {
+				log.Printf("Error visiting directory %s: %v", childPath, err)
+				// Continue despite error
 			}
 		}
-		d, f, err := visit(filepath.Join(path, name), indent+add, w)
-		if err != nil {
-			log.Println(err)
-		}
-		dirs, files = dirs+d, files+f
 	}
-	return dirs + 1, files, nil
+
+	return nil
 }
 
-func removeHidden(files []string) []string {
-	var clean []string
-	for _, f := range files {
-		if f[0] != '.' {
-			clean = append(clean, f)
+// buildPrefix creates the proper prefix for tree visualization.
+func buildPrefix(parentPrefix string, isLast bool) string {
+	if isLast {
+		return parentPrefix + "└── "
+	}
+	return parentPrefix + "├── "
+}
+
+// flattenNode returns a slice of nodes in display order.
+func (node *FileNode) flatten() []*FileNode {
+	result := []*FileNode{node} // Start with current node
+
+	// Only process children if this is a directory and it's expanded
+	if node.isDir && node.expanded {
+		for _, child := range node.children {
+			// Recursively flatten each child and append to result
+			result = append(result, child.flatten()...)
 		}
 	}
-	return clean
+
+	// fmt.Println("len(result):", len(result))
+	return result
 }
