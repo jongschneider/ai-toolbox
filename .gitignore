@@ -3,3 +3,4 @@ result-*
 .direnv/
 vendor/
 output.txt
+*.cov
