@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"golang.org/x/term"
 )
 
 type FileNode struct {
@@ -40,10 +41,12 @@ func (node *FileNode) String() string {
 }
 
 type model struct {
-	workDir   string
-	rootNode  *FileNode
-	cursor    int
-	flatNodes []*FileNode
+	workDir    string
+	rootNode   *FileNode
+	cursor     int
+	flatNodes  []*FileNode
+	windowSize int // Number of items to show at once
+	offset     int // Starting index for the window
 }
 
 func buildFileTree(path string, removeHidden bool) (*FileNode, error) {
@@ -73,41 +76,6 @@ func (m *model) Init() tea.Cmd {
 	return nil
 }
 
-func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) { //nolint:gocritic
-	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+c", "q":
-			return m, tea.Quit
-		case "up", "k":
-			if m.cursor > 0 {
-				m.cursor--
-			}
-		case "down", "j":
-			if m.cursor < len(m.flatNodes)-1 {
-				m.cursor++
-			}
-		case " ":
-			currentNode := m.flatNodes[m.cursor]
-			if currentNode.isDir {
-				m.toggleDirSelection(currentNode)
-			} else {
-				currentNode.selected = !currentNode.selected
-			}
-		case "l", "h":
-			currentNode := m.flatNodes[m.cursor]
-			if currentNode.isDir {
-				currentNode.expanded = !currentNode.expanded
-				m.flattenTree()
-			}
-		case "enter":
-			m.generateOutput()
-			return m, tea.Quit
-		}
-	}
-	return m, nil
-}
-
 func (m *model) toggleDirSelection(node *FileNode) {
 	node.selected = !node.selected
 	for _, child := range node.children {
@@ -117,25 +85,6 @@ func (m *model) toggleDirSelection(node *FileNode) {
 			child.selected = node.selected
 		}
 	}
-}
-
-func (m *model) View() string {
-	var s strings.Builder
-
-	for i, node := range m.flatNodes {
-		line := node.String()
-		if i == m.cursor {
-			line = "> " + line
-		} else {
-			line = "  " + line
-		}
-		s.WriteString(line + "\n")
-	}
-
-	s.WriteString(
-		"\nPress space to select, l/h to expand/collapse directories, enter to generate output, q to quit\n",
-	)
-	return s.String()
 }
 
 func (m *model) generateOutput() {
@@ -173,18 +122,118 @@ func main() {
 		fmt.Printf("Error building file tree: %v\n", err)
 		os.Exit(1)
 	}
+	// Get terminal height and set window size to leave room for help text
+	_, h, _ := term.GetSize(int(os.Stdout.Fd()))
+	windowSize := h - 2 // Leave space for help text
 
 	initialModel := &model{
-		workDir:  workDir,
-		rootNode: rootNode,
-		cursor:   0,
+		workDir:    workDir,
+		rootNode:   rootNode,
+		cursor:     0,
+		windowSize: windowSize,
+		offset:     0,
 	}
 
 	initialModel.flattenTree()
 
-	p := tea.NewProgram(initialModel)
+	p := tea.NewProgram(initialModel, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Error running program: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		// Update window size when terminal is resized
+		m.windowSize = msg.Height - 4
+
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "ctrl+c", "q":
+			return m, tea.Quit
+
+		case "up", "k":
+			if m.cursor > 0 {
+				m.cursor--
+				// Adjust offset if cursor moves above window
+				if m.cursor < m.offset {
+					m.offset = m.cursor
+				}
+			}
+
+		case "down", "j":
+			if m.cursor < len(m.flatNodes)-1 {
+				m.cursor++
+				// Adjust offset if cursor moves below window
+				if m.cursor >= m.offset+m.windowSize {
+					m.offset = m.cursor - m.windowSize + 1
+				}
+			}
+
+		case " ":
+			currentNode := m.flatNodes[m.cursor]
+			if currentNode.isDir {
+				m.toggleDirSelection(currentNode)
+			} else {
+				currentNode.selected = !currentNode.selected
+			}
+
+		case "l", "h":
+			currentNode := m.flatNodes[m.cursor]
+			if currentNode.isDir {
+				currentNode.expanded = !currentNode.expanded
+				m.flattenTree()
+				// Adjust offset if necessary after tree changes
+				if m.cursor >= len(m.flatNodes) {
+					m.cursor = len(m.flatNodes) - 1
+				}
+				if m.offset > m.cursor {
+					m.offset = m.cursor
+				}
+			}
+
+		case "enter":
+			m.generateOutput()
+			return m, tea.Quit
+		}
+	}
+
+	return m, nil
+}
+
+func (m *model) View() string {
+	var builder strings.Builder
+
+	// Calculate the visible range
+	end := m.offset + m.windowSize
+	if end > len(m.flatNodes) {
+		end = len(m.flatNodes)
+	}
+
+	// Only render the visible portion of the tree
+	for i := m.offset; i < end; i++ {
+		node := m.flatNodes[i]
+		line := node.String()
+		if i == m.cursor {
+			line = "> " + line
+		} else {
+			line = "  " + line
+		}
+		builder.WriteString(line + "\n")
+	}
+
+	// Add scrolling indicators if necessary
+	if m.offset > 0 {
+		builder.WriteString("(↑ more above)\n")
+	}
+	if end < len(m.flatNodes) {
+		builder.WriteString("(↓ more below)\n")
+	}
+
+	builder.WriteString(
+		"\nPress space to select, l/h to expand/collapse directories, enter to generate output, q to quit\n",
+	)
+	return builder.String()
 }
