@@ -12,7 +12,7 @@ func visitNode(node *FileNode, prefix string, removeHidden bool) error {
 	entries, err := os.ReadDir(node.path)
 	if err != nil {
 		log.Printf("Error reading directory %s: %v", node.path, err)
-		return nil // Continue despite error
+		return err
 	}
 
 	// Process each entry in the directory
@@ -30,7 +30,7 @@ func visitNode(node *FileNode, prefix string, removeHidden bool) error {
 			path:     childPath,
 			isDir:    entry.IsDir(),
 			prefix:   buildPrefix(prefix, isLast),
-			expanded: true,
+			expanded: false,
 		}
 
 		// Add child to parent's children
@@ -48,7 +48,7 @@ func visitNode(node *FileNode, prefix string, removeHidden bool) error {
 
 			if err := visitNode(childNode, newPrefix, removeHidden); err != nil {
 				log.Printf("Error visiting directory %s: %v", childPath, err)
-				// Continue despite error
+				return err
 			}
 		}
 	}
@@ -68,7 +68,6 @@ func buildPrefix(parentPrefix string, isLast bool) string {
 func (node *FileNode) flatten() []*FileNode {
 	result := []*FileNode{node} // Start with current node
 
-	// Only process children if this is a directory and it's expanded
 	if node.isDir && node.expanded {
 		for _, child := range node.children {
 			// Recursively flatten each child and append to result
@@ -76,6 +75,5 @@ func (node *FileNode) flatten() []*FileNode {
 		}
 	}
 
-	// fmt.Println("len(result):", len(result))
 	return result
 }
