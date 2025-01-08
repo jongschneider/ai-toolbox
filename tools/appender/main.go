@@ -41,31 +41,32 @@ func (node *FileNode) String() string {
 }
 
 type model struct {
-	workDir    string
-	rootNode   *FileNode
-	cursor     int
-	flatNodes  []*FileNode
-	windowSize int // Number of items to show at once
-	offset     int // Starting index for the window
+	workDir      string
+	rootNode     *FileNode
+	cursor       int
+	flatNodes    []*FileNode
+	windowSize   int // Number of items to show at once
+	offset       int // Starting index for the window
+	removeHidden bool
 }
 
-func buildFileTree(path string, removeHidden bool) (*FileNode, error) {
-	info, err := os.Stat(path)
+func (m *model) buildFileTree() error {
+	info, err := os.Stat(m.workDir)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	node := &FileNode{
+	m.rootNode = &FileNode{
 		name:     info.Name(),
-		path:     path,
+		path:     m.workDir,
 		isDir:    info.IsDir(),
 		isRoot:   true,
 		expanded: true,
 		selected: false,
 	}
 
-	err = visitNode(node, "", removeHidden)
-	return node, err
+	err = visitNode(m.rootNode, "", m.removeHidden)
+	return err
 }
 
 func (m *model) flattenTree() {
@@ -117,21 +118,24 @@ func main() {
 		workDir = os.Args[1]
 	}
 
-	rootNode, err := buildFileTree(workDir, true)
-	if err != nil {
-		fmt.Printf("Error building file tree: %v\n", err)
-		os.Exit(1)
-	}
+	// rootNode, err := buildFileTree(workDir, true)
+	// if err != nil {
+	// 	fmt.Printf("Error building file tree: %v\n", err)
+	// 	os.Exit(1)
+	// }
 	// Get terminal height and set window size to leave room for help text
 	_, h, _ := term.GetSize(int(os.Stdout.Fd()))
 	windowSize := h - 2 // Leave space for help text
 
 	initialModel := &model{
-		workDir:    workDir,
-		rootNode:   rootNode,
-		cursor:     0,
-		windowSize: windowSize,
-		offset:     0,
+		workDir:      workDir,
+		windowSize:   windowSize,
+		removeHidden: true,
+	}
+
+	if err := initialModel.buildFileTree(); err != nil {
+		fmt.Printf("Error building file tree: %v\n", err)
+		os.Exit(1)
 	}
 
 	initialModel.flattenTree()
@@ -193,6 +197,14 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.offset = m.cursor
 				}
 			}
+
+		case ".":
+			m.removeHidden = !m.removeHidden
+			if err := m.buildFileTree(); err != nil {
+				fmt.Printf("Error building file tree: %v\n", err)
+				os.Exit(1)
+			}
+			m.flattenTree()
 
 		case "enter":
 			m.generateOutput()
