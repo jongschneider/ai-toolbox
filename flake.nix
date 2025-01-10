@@ -25,8 +25,8 @@
         ...
       }: let
         # version = "latest";
-        # vendorHash = "sha256-z5SVcJSzeHnFijBOLIJMbHShT/P5f2uQ3SIZzyrUtVI="; # update whenever go.mod changes
-        vendorHash = null;
+        vendorHash = "sha256-qLVM/LQYqfOm+eqIIBoSdiG1Qeftz0Mw1gkHB26tVRM="; # update whenever go.mod changes
+        # vendorHash = null;
         buildTool = name:
           pkgs.buildGoModule {
             inherit name vendorHash;
