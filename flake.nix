@@ -25,14 +25,14 @@
         ...
       }: let
         # version = "latest";
-        vendorHash = "sha256-qLVM/LQYqfOm+eqIIBoSdiG1Qeftz0Mw1gkHB26tVRM="; # update whenever go.mod changes
-        # vendorHash = null;
         buildTool = name:
           pkgs.buildGoModule {
-            inherit name vendorHash;
+            inherit name;
             src = ./.;
             subPackages = ["tools/${name}"];
-            proxyVendor = true;
+            # proxyVendor = true;
+            vendorHash = null;
+            # vendorHash = "sha256-mn5mj5KfULPFp/7dX6G6IprNksZDxTO9ihmXZdLz5uQ="; # update whenever go.mod changes
           };
       in {
         # Packages
