@@ -46,7 +46,7 @@ If you have Go 1.23.4 or later installed:
 
 ```shell
 # Install from a specific commit (once repository is public)
-go install github.com/jongschneider/ai-toolbox/tools/appender@{commit-hash}
+go install github.com/jongschneider/ai-toolbox/tools/appender@latest
 
 # Or if no releases exist yet, build from source:
 
