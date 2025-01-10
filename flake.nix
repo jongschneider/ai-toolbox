@@ -64,22 +64,22 @@
         };
         pre-commit.settings.hooks = {
           alejandra.enable = true;
-          # gofmt.enable = true;
-          # golines.enable = true;
-          # golangci-lint.enable = true;
-          # govet.enable = true;
-          # staticcheck.enable = true;
-          # deadnix.enable = true;
-          # statix.enable = true;
-          # trim-trailing-whitespace.enable = true;
-          # check-yaml.enable = true;
-          # yamlfmt.enable = true;
-          # fix-byte-order-marker.enable = true;
-          # flake-checker.enable = true;
-          # # markdownlint.enable = true;
-          # prettier.enable = true;
-          # ripsecrets.enable = true;
-          # shellcheck.enable = true;
+          gofmt.enable = true;
+          golines.enable = true;
+          golangci-lint.enable = true;
+          govet.enable = true;
+          staticcheck.enable = true;
+          deadnix.enable = true;
+          statix.enable = true;
+          trim-trailing-whitespace.enable = true;
+          check-yaml.enable = true;
+          yamlfmt.enable = true;
+          fix-byte-order-marker.enable = true;
+          flake-checker.enable = true;
+          markdownlint.enable = true;
+          prettier.enable = true;
+          ripsecrets.enable = true;
+          shellcheck.enable = true;
         };
 
         formatter = pkgs.alejandra;
