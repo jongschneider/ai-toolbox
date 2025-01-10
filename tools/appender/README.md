@@ -3,6 +3,12 @@
 Appender is a CLI tool designed to make interacting with Chat LLMs like Claude.ai easier when writing code.
 The goal is to capture the filename and contents of files in to feed into a prompt in order to give the current state of the codebase we are working in.
 
+## TODO
+[] use https://github.com/charmbracelet/lipgloss#rendering-trees to build tree.
+[] add state for hidden files, expanded and selected.
+[] add preview pane.
+[] add copy to clipboard option / save to file.
+
 ## Expected Behavior
 
 1. cli
