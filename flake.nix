@@ -30,9 +30,10 @@
             inherit name;
             src = ./.;
             subPackages = ["tools/${name}"];
-            # proxyVendor = true;
-            vendorHash = null;
-            # vendorHash = "sha256-mn5mj5KfULPFp/7dX6G6IprNksZDxTO9ihmXZdLz5uQ="; # update whenever go.mod changes
+            # First try with vendorHash = null to get the correct hash
+            # vendorHash = "sha256-/cCTEXhD+UEW2A3ErIit8XucgBmmn7xzksKNH4Bvfx4="; # update whenever go.mod changes
+            vendorHash = "sha256-/cCTEXhD+UEW2A3ErIit8XucgBmmn7xzksKNH4Bvfx4="; # update whenever go.mod changes
+            # vendorHash = null;
           };
       in {
         # Packages
