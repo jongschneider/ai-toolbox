@@ -76,7 +76,6 @@
           yamlfmt.enable = true;
           fix-byte-order-marker.enable = true;
           flake-checker.enable = true;
-          markdownlint.enable = true;
           prettier.enable = true;
           ripsecrets.enable = true;
           shellcheck.enable = true;
