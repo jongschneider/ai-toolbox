@@ -3,3 +3,4 @@ result-*
 .direnv/
 output.txt
 *.cov
+*.log

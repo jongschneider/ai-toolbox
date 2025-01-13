@@ -3,6 +3,7 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -45,6 +46,7 @@ type model struct {
 	rootNode     *FileNode
 	cursor       int
 	flatNodes    []*FileNode
+	nodeLookup   map[string]*FileNode
 	windowSize   int // Number of items to show at once
 	offset       int // Starting index for the window
 	removeHidden bool
@@ -56,6 +58,11 @@ func (m *model) buildFileTree() error {
 		return err
 	}
 
+	// handle janky "." right now
+	if m.nodeLookup == nil {
+		m.nodeLookup = make(map[string]*FileNode)
+	}
+
 	m.rootNode = &FileNode{
 		name:     info.Name(),
 		path:     m.workDir,
@@ -65,12 +72,17 @@ func (m *model) buildFileTree() error {
 		selected: false,
 	}
 
-	err = visitNode(m.rootNode, "", m.removeHidden)
+	err = visitNode(m.rootNode, "", m.removeHidden, m.nodeLookup)
 	return err
 }
 
 func (m *model) flattenTree() {
-	m.flatNodes = m.rootNode.flatten()
+	filters := make([]FilterFunc, 0)
+	if m.removeHidden {
+		filters = append(filters, FilterHidden)
+	}
+	slog.Info("before flatten")
+	m.flatNodes = m.rootNode.flatten(m.nodeLookup, filters...)
 }
 
 func (m *model) Init() tea.Cmd {
@@ -79,11 +91,13 @@ func (m *model) Init() tea.Cmd {
 
 func (m *model) toggleDirSelection(node *FileNode) {
 	node.selected = !node.selected
+	m.nodeLookup[node.path] = node
 	for _, child := range node.children {
 		if child.isDir {
 			m.toggleDirSelection(child)
 		} else {
 			child.selected = node.selected
+			m.nodeLookup[child.path] = child
 		}
 	}
 }
@@ -113,16 +127,17 @@ func (m *model) collectSelectedFiles(node *FileNode, output *strings.Builder) {
 }
 
 func main() {
+	if err := setupLogging(); err != nil {
+		fmt.Printf("Error setting up logging: %v\n", err)
+		os.Exit(1)
+	}
+	slog.Info("starting application")
+
 	workDir := "."
 	if len(os.Args) > 1 {
 		workDir = os.Args[1]
 	}
 
-	// rootNode, err := buildFileTree(workDir, true)
-	// if err != nil {
-	// 	fmt.Printf("Error building file tree: %v\n", err)
-	// 	os.Exit(1)
-	// }
 	// Get terminal height and set window size to leave room for help text
 	_, h, _ := term.GetSize(int(os.Stdout.Fd()))
 	windowSize := h - 2 // Leave space for help text
@@ -138,8 +153,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	slog.Info("before flattenTree")
 	initialModel.flattenTree()
 
+	slog.Info("after flattenTree")
 	p := tea.NewProgram(initialModel, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Error running program: %v\n", err)
@@ -182,12 +199,14 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.toggleDirSelection(currentNode)
 			} else {
 				currentNode.selected = !currentNode.selected
+				m.nodeLookup[currentNode.path] = currentNode
 			}
 
 		case "l", "h":
 			currentNode := m.flatNodes[m.cursor]
 			if currentNode.isDir {
 				currentNode.expanded = !currentNode.expanded
+				m.nodeLookup[currentNode.path] = currentNode
 				m.flattenTree()
 				// Adjust offset if necessary after tree changes
 				if m.cursor >= len(m.flatNodes) {
@@ -200,11 +219,13 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case ".":
 			m.removeHidden = !m.removeHidden
-			if err := m.buildFileTree(); err != nil {
-				fmt.Printf("Error building file tree: %v\n", err)
-				os.Exit(1)
-			}
+			// if err := m.buildFileTree(); err != nil {
+			// 	fmt.Printf("Error building file tree: %v\n", err)
+			// 	os.Exit(1)
+			// }
+			slog.With("removehidden", m.removeHidden).Info("before hidden flatten:")
 			m.flattenTree()
+			slog.With("removehidden", m.removeHidden).Info("after hidden flatten")
 
 		case "enter":
 			m.generateOutput()
@@ -216,12 +237,17 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *model) View() string {
+	slog.Info("rendering view...")
 	var builder strings.Builder
 
 	// Calculate the visible range
 	end := m.offset + m.windowSize
 	if end > len(m.flatNodes) {
 		end = len(m.flatNodes)
+	}
+
+	if m.cursor >= len(m.flatNodes) {
+		m.cursor = 0
 	}
 
 	// Only render the visible portion of the tree
@@ -248,4 +274,25 @@ func (m *model) View() string {
 		"\nPress space to select, l/h to expand/collapse directories, enter to generate output, q to quit\n",
 	)
 	return builder.String()
+}
+
+func setupLogging() error {
+	// Create logs directory if it doesn't exist
+	if err := os.MkdirAll("logs", 0o755); err != nil {
+		return fmt.Errorf("could not create logs directory: %w", err)
+	}
+
+	// Open log file
+	logFile, err := tea.LogToFile("logs/debug.log", "debug")
+	if err != nil {
+		return fmt.Errorf("could not open log file: %w", err)
+	}
+
+	// Configure slog
+	logger := slog.New(slog.NewJSONHandler(logFile, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}))
+	slog.SetDefault(logger)
+
+	return nil
 }

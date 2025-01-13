@@ -5,8 +5,9 @@ The goal is to capture the filename and contents of files in to feed into a prom
 
 ## TODO
 
-[] use https://github.com/charmbracelet/lipgloss#rendering-trees to build tree. - see https://github.com/dlvhdr/diffnav/blob/2ca04b3d07ff73c8cd3aa89b4d99b68646640e5f/pkg/ui/panes/filetree/filetree.go#L12 for reference
-[] add state for hidden files, expanded and selected.
+~~[] use https://github.com/charmbracelet/lipgloss#rendering-trees to build tree. - see https://github.com/dlvhdr/diffnav/blob/2ca04b3d07ff73c8cd3aa89b4d99b68646640e5f/pkg/ui/panes/filetree/filetree.go#L12 for reference~~
+[] add state for hidden files, expanded and selected. - on buildTree, add node to map that tracks state. lookup based on full path so we can get from list to node.
+[] use filterFunc to remove hidden, or filter by name.
 [] add preview pane.
 [] add copy to clipboard option / save to file.
 
