@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"golang.org/x/term"
 )
 
@@ -47,9 +48,14 @@ type model struct {
 	cursor       int
 	flatNodes    []*FileNode
 	nodeLookup   map[string]*FileNode
-	windowSize   int // Number of items to show at once
-	offset       int // Starting index for the window
+	windowSize   windowSize // Number of items to show at once
+	offset       int        // Starting index for the window
 	removeHidden bool
+}
+
+type windowSize struct {
+	height int
+	width  int
 }
 
 func (m *model) buildFileTree() error {
@@ -139,12 +145,15 @@ func main() {
 	}
 
 	// Get terminal height and set window size to leave room for help text
-	_, h, _ := term.GetSize(int(os.Stdout.Fd()))
-	windowSize := h - 2 // Leave space for help text
+	w, h, _ := term.GetSize(int(os.Stdout.Fd()))
+	// windowSize := h - 2 // Leave space for help text
 
 	initialModel := &model{
-		workDir:      workDir,
-		windowSize:   windowSize,
+		workDir: workDir,
+		windowSize: windowSize{
+			width:  w,
+			height: h - 2, // Leave space for help text,
+		},
 		removeHidden: true,
 	}
 
@@ -168,7 +177,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		// Update window size when terminal is resized
-		m.windowSize = msg.Height - 4
+		m.windowSize.height = msg.Height - 4
 
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -188,8 +197,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.cursor < len(m.flatNodes)-1 {
 				m.cursor++
 				// Adjust offset if cursor moves below window
-				if m.cursor >= m.offset+m.windowSize {
-					m.offset = m.cursor - m.windowSize + 1
+				if m.cursor >= m.offset+m.windowSize.height {
+					m.offset = m.cursor - m.windowSize.height + 1
 				}
 			}
 
@@ -241,7 +250,7 @@ func (m *model) View() string {
 	var builder strings.Builder
 
 	// Calculate the visible range
-	end := m.offset + m.windowSize
+	end := m.offset + m.windowSize.height
 	if end > len(m.flatNodes) {
 		end = len(m.flatNodes)
 	}
@@ -273,7 +282,26 @@ func (m *model) View() string {
 	builder.WriteString(
 		"\nPress space to select, l/h to expand/collapse directories, enter to generate output, q to quit\n",
 	)
-	return builder.String()
+
+	// Style definitions
+	treeStyle := lipgloss.NewStyle().
+		Width(m.windowSize.width / 3).
+		Height(m.windowSize.height).
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("62")).
+		Padding(1)
+
+	contentStyle := lipgloss.NewStyle().
+		Width(2 * m.windowSize.width / 3).
+		Height(m.windowSize.height).
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("62")).
+		Padding(1)
+
+	treeContent := builder.String()
+	leftPane := treeStyle.Render(treeContent)
+	rightPane := contentStyle.Render("")
+	return lipgloss.JoinHorizontal(lipgloss.Top, leftPane, rightPane)
 }
 
 func setupLogging() error {
