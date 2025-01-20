@@ -4,8 +4,10 @@ Appender is a CLI tool designed to make interacting with Chat LLMs like Claude.a
 The goal is to capture the filename and contents of files in to feed into a prompt in order to give the current state of the codebase we are working in.
 
 ## TODO
-[] use https://github.com/charmbracelet/lipgloss#rendering-trees to build tree.
-[] add state for hidden files, expanded and selected.
+
+~~[] use https://github.com/charmbracelet/lipgloss#rendering-trees to build tree. - see https://github.com/dlvhdr/diffnav/blob/2ca04b3d07ff73c8cd3aa89b4d99b68646640e5f/pkg/ui/panes/filetree/filetree.go#L12 for reference~~
+[] add state for hidden files, expanded and selected. - on buildTree, add node to map that tracks state. lookup based on full path so we can get from list to node.
+[] use filterFunc to remove hidden, or filter by name.
 [] add preview pane.
 [] add copy to clipboard option / save to file.
 
@@ -107,7 +109,9 @@ $ appender
 │       └── main.go 
 └── vendor
 ```
+
 6. When the user presses `enter` key, the program will register the selected files and create a new file called `output.txt` that includes each selected file along with it's relative path in a comment.
+
 ```sh
 $ appender
 .
@@ -124,7 +128,9 @@ $ appender
 │       └── main.go 
 └── vendor
 ```
+
 Will produce a file called `output.txt` with the following contents:
+
 ```txt
 # tools/appender/README.md
 This is some text

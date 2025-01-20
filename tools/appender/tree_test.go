@@ -32,10 +32,11 @@ func Test_visitNode(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := visitNode(tt.node, tt.prefix, true)
+			nm := make(map[string]*FileNode)
+			err := visitNode(tt.node, tt.prefix, true, nm)
 			tt.expect(t, tt.node, err)
 
-			nodes := tt.node.flatten()
+			nodes := tt.node.flatten(nm)
 
 			for _, n := range nodes {
 				fmt.Println(n.String()) //nolint:forbidigo
