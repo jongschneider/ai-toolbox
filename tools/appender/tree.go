@@ -1,12 +1,41 @@
 package main
 
 import (
+	"fmt"
 	"log"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 )
+
+type FileNode struct {
+	name     string // name represents the name of the file or directory
+	path     string // path represents the full path of the file or directory
+	isDir    bool   // isDir is used to identify directories
+	isRoot   bool   // isRoot is only used to identify the root node.
+	expanded bool   // expanded is used to show/hide the children of a directory
+	selected bool
+	prefix   string      // prefix is used in the View method to draw the tree structure
+	children []*FileNode // includes directories and files
+}
+
+func (node *FileNode) String() string {
+	dirIndicator := ""
+	if node.isDir && !node.isRoot {
+		if node.expanded {
+			dirIndicator = " "
+		} else {
+			dirIndicator = " "
+		}
+	}
+
+	selected := ""
+	if node.selected {
+		selected = "  "
+	}
+
+	return fmt.Sprintf("%s%s%s%s", node.prefix, dirIndicator, node.name, selected)
+}
 
 func visitNode(
 	node *FileNode,
@@ -77,7 +106,6 @@ type FilterFunc func(node *FileNode) bool
 
 func FilterHidden(node *FileNode) bool {
 	isHidden := strings.HasPrefix(node.name, ".") && node.name != "."
-	slog.With("node", node.name, "hidden", isHidden).Info("filter hidden")
 	return isHidden
 }
 
