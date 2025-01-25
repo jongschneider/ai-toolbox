@@ -4,3 +4,4 @@ result-*
 output.txt
 *.cov
 *.log
+logs

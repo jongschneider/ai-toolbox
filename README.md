@@ -129,11 +129,11 @@ just new-tool toolname
 
 ```
 .
-├── flake.nix           # Nix flake configuration
+├── flake.nix          # Nix flake configuration
 ├── go.work            # Go workspace configuration
 ├── justfile           # Development command definitions
-└── tools/            # Directory containing all tools
-    └── appender/     # Appender tool source code
+└── tools/             # Directory containing all tools
+    └── appender/      # Appender tool source code
 ```
 
 ## Contributing
