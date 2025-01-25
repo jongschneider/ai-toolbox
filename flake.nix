@@ -31,9 +31,8 @@
             src = ./.;
             subPackages = ["tools/${name}"];
             # First try with vendorHash = null to get the correct hash
-            vendorHash = "sha256-Rch0vHSVndoTwQveMEzvofM/6KfuZq6sGsMgP0dzk1o="; # update whenever go.mod changes
-            # vendorHash = ""; # update whenever go.mod changes
-            # vendorHash = null;
+            vendorHash = "sha256-wWEas0cdoc3m7gtuCSJeW01WrXfsuKQEA+8qSjupmh8="; # update whenever go.mod changes
+            # vendorHash = ""; # update whenever go.mod changes. don't foget to `ga .`  🤡
           };
       in {
         # Packages

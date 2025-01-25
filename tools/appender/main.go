@@ -9,20 +9,39 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
+	"github.com/jongschneider/ai-toolbox/tools/appender/config"
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 	"golang.org/x/term"
 )
 
 func main() {
+	if err := config.InitConfig(); err != nil {
+		fmt.Printf("Error initializing config: %v\n", err)
+		os.Exit(1)
+	}
+
+	flags := pflag.NewFlagSet("appender", pflag.ExitOnError)
+	flags.IntP("logging", "l", 0, "Logging level (1=DEBUG, 2=INFO, 3=WARN, 4=ERROR)")
+	if err := flags.Parse(os.Args[1:]); err != nil {
+		fmt.Printf("Error parsing flags: %v\n", err)
+		os.Exit(1)
+	}
+	if err := viper.BindPFlags(flags); err != nil {
+		fmt.Printf("Error binding flags: %v\n", err)
+		os.Exit(1)
+	}
+
+	workDir := "."
+	if flags.NArg() > 0 {
+		workDir = flags.Arg(0)
+	}
+
 	if err := setupLogging(); err != nil {
 		fmt.Printf("Error setting up logging: %v\n", err)
 		os.Exit(1)
 	}
 	slog.Info("starting application")
-
-	workDir := "."
-	if len(os.Args) > 1 {
-		workDir = os.Args[1]
-	}
 
 	// Get terminal height and set window size to leave room for help text
 	w, h, _ := term.GetSize(int(os.Stdout.Fd())) //nolint:varnamelen
