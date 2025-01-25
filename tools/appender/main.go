@@ -106,9 +106,37 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		)
 
 	case tea.KeyMsg:
+		if m.showClipboardModal {
+			switch msg.String() {
+			case "y":
+				err := m.copyToClipboard()
+				if err != nil {
+					m.clipboardError = err
+					return m, nil
+				}
+				m.showClipboardModal = false
+				return m, tea.Quit
+			case "n", "esc":
+				m.showClipboardModal = false
+				m.clipboardError = nil
+				return m, nil
+			default:
+				if m.clipboardError != nil {
+					m.showClipboardModal = false
+					m.clipboardError = nil
+				}
+				return m, nil
+			}
+		}
+
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
+
+		case "c":
+			slog.Info("pressing c")
+			m.showClipboardModal = true
+			return m, nil
 
 		// Navigation keys are handled by handleKeyPress
 		case "up", "k", "down", "j", "pgup", "pgdown", "home", "end":
