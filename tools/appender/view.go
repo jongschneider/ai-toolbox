@@ -7,6 +7,29 @@ import (
 )
 
 func (m *model) View() string {
+	if m.showSaveModal {
+		modalStyle := lipgloss.NewStyle().
+			Width(60).
+			Align(lipgloss.Center).
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("62")).
+			Padding(1)
+
+		modal := modalStyle.Render(
+			"Save output to file\n\n" +
+				m.outputPath.View() + "\n\n" +
+				"[enter to save, esc to cancel]",
+		)
+
+		return lipgloss.Place(
+			m.windowSize.width,
+			m.windowSize.height,
+			lipgloss.Center,
+			lipgloss.Center,
+			modal,
+		)
+	}
+
 	if m.showClipboardModal {
 		modalStyle := lipgloss.NewStyle().
 			Width(40).

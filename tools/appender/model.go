@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/atotto/clipboard"
+	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
@@ -29,6 +30,8 @@ type model struct {
 	rightViewport      viewport.Model
 	showClipboardModal bool
 	clipboardError     error
+	showSaveModal      bool
+	outputPath         textarea.Model
 }
 
 type windowSize struct {
