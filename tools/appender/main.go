@@ -6,23 +6,43 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
+	"github.com/jongschneider/ai-toolbox/tools/appender/config"
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 	"golang.org/x/term"
 )
 
 func main() {
+	if err := config.InitConfig(); err != nil {
+		fmt.Printf("Error initializing config: %v\n", err)
+		os.Exit(1)
+	}
+
+	flags := pflag.NewFlagSet("appender", pflag.ExitOnError)
+	flags.IntP("logging", "l", 0, "Logging level (1=DEBUG, 2=INFO, 3=WARN, 4=ERROR)")
+	if err := flags.Parse(os.Args[1:]); err != nil {
+		fmt.Printf("Error parsing flags: %v\n", err)
+		os.Exit(1)
+	}
+	if err := viper.BindPFlags(flags); err != nil {
+		fmt.Printf("Error binding flags: %v\n", err)
+		os.Exit(1)
+	}
+
+	workDir := "."
+	if flags.NArg() > 0 {
+		workDir = flags.Arg(0)
+	}
+
 	if err := setupLogging(); err != nil {
 		fmt.Printf("Error setting up logging: %v\n", err)
 		os.Exit(1)
 	}
 	slog.Info("starting application")
-
-	workDir := "."
-	if len(os.Args) > 1 {
-		workDir = os.Args[1]
-	}
 
 	// Get terminal height and set window size to leave room for help text
 	w, h, _ := term.GetSize(int(os.Stdout.Fd())) //nolint:varnamelen
@@ -35,6 +55,13 @@ func main() {
 		fmt.Printf("Error creating renderer: %v\n", err)
 		os.Exit(1)
 	}
+	txtArea := textarea.New()
+	txtArea.SetValue("output.txt")
+	txtArea.ShowLineNumbers = false
+	txtArea.Placeholder = "Enter filename..."
+	txtArea.Focus()
+	txtArea.SetHeight(1)
+	txtArea.CharLimit = 255
 	initialModel := &model{
 		workDir: workDir,
 		windowSize: windowSize{
@@ -51,6 +78,7 @@ func main() {
 			2*w/3-4, // Width (adjusted for borders and padding)
 			h-4,     // Height (adjusted for borders and padding)
 		),
+		outputPath: txtArea,
 	}
 
 	if err := initialModel.buildFileTree(); err != nil {
@@ -87,9 +115,58 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		)
 
 	case tea.KeyMsg:
+		if m.showSaveModal {
+			switch msg.String() {
+			case "esc":
+				m.showSaveModal = false
+				m.outputPath.Reset()
+				m.outputPath.SetValue("output.txt")
+				return m, nil
+			case "enter":
+				f, err := os.Create(m.outputPath.Value())
+				if err != nil {
+					slog.Error("Failed to create file", "error", err)
+					return m, nil
+				}
+				defer f.Close()
+				m.generateOutput(f)
+				return m, tea.Quit
+			}
+			var cmd tea.Cmd
+			m.outputPath, cmd = m.outputPath.Update(msg)
+			return m, cmd
+		}
+		if m.showClipboardModal {
+			switch msg.String() {
+			case "y":
+				err := m.copyToClipboard()
+				if err != nil {
+					m.clipboardError = err
+					return m, nil
+				}
+				m.showClipboardModal = false
+				return m, tea.Quit
+			case "n", "esc":
+				m.showClipboardModal = false
+				m.clipboardError = nil
+				return m, nil
+			default:
+				if m.clipboardError != nil {
+					m.showClipboardModal = false
+					m.clipboardError = nil
+				}
+				return m, nil
+			}
+		}
+
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
+
+		case "c":
+			slog.Info("pressing c")
+			m.showClipboardModal = true
+			return m, nil
 
 		// Navigation keys are handled by handleKeyPress
 		case "up", "k", "down", "j", "pgup", "pgdown", "home", "end":
@@ -139,17 +216,12 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.removeHidden = !m.removeHidden
 			m.flattenTree()
 			return m, m.updateTree()
-
 		case "enter":
-			f, err := os.Create("output.txt")
-			if err != nil {
-				slog.With("err", err).Error("Error creating output file")
-				return m, tea.Quit
+			if !m.showSaveModal {
+				m.showSaveModal = true
+				m.outputPath.Focus()
+				return m, nil
 			}
-			defer f.Close()
-
-			m.generateOutput(f)
-			return m, tea.Quit
 		}
 	}
 

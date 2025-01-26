@@ -9,23 +9,29 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/atotto/clipboard"
+	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
 )
 
 type model struct {
-	workDir       string
-	rootNode      *FileNode
-	cursor        int
-	flatNodes     []*FileNode
-	nodeLookup    map[string]*FileNode
-	windowSize    windowSize // Number of items to show at once
-	offset        int        // Starting index for the window
-	renderer      *glamour.TermRenderer
-	removeHidden  bool
-	leftViewport  viewport.Model
-	rightViewport viewport.Model
+	workDir            string
+	rootNode           *FileNode
+	cursor             int
+	flatNodes          []*FileNode
+	nodeLookup         map[string]*FileNode
+	windowSize         windowSize // Number of items to show at once
+	offset             int        // Starting index for the window
+	renderer           *glamour.TermRenderer
+	removeHidden       bool
+	leftViewport       viewport.Model
+	rightViewport      viewport.Model
+	showClipboardModal bool
+	clipboardError     error
+	showSaveModal      bool
+	outputPath         textarea.Model
 }
 
 type windowSize struct {
@@ -253,4 +259,10 @@ func (m *model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, cmd
+}
+
+func (m *model) copyToClipboard() error {
+	var output strings.Builder
+	m.collectSelectedFiles(m.rootNode, &output)
+	return clipboard.WriteAll(output.String())
 }
