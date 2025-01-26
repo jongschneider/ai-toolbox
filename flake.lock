@@ -57,10 +57,7 @@
     },
     "gitignore": {
       "inputs": {
-        "nixpkgs": [
-          "git-hooks-nix",
-          "nixpkgs"
-        ]
+        "nixpkgs": ["git-hooks-nix", "nixpkgs"]
       },
       "locked": {
         "lastModified": 1709087332,

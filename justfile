@@ -31,9 +31,14 @@ lint-all:
 clean:
     rm -rf result
 
+# Run pre-commit hooks
+pre-commit:
+    nix develop --command bash -c 'pre-commit run --all-files'
+
 # Initialize a new tool
 new-tool TOOL:
     mkdir -p tools/{{TOOL}}
     cd tools/{{TOOL}} && go mod init github.com/yourusername/ai-toolbox/tools/{{TOOL}}
     printf 'package main\n\nimport "fmt"\n\nfunc main() {\n\tfmt.Println("Hello, World from {{TOOL}}!") //nolint:forbidigo\n}\n' > tools/{{TOOL}}/main.go
     go work use ./tools/{{TOOL}}
+
