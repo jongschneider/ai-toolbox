@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/charmbracelet/bubbles/help"
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -79,6 +81,8 @@ func main() {
 			h-4,     // Height (adjusted for borders and padding)
 		),
 		outputPath: txtArea,
+		keys:       keys,
+		help:       help.New(),
 	}
 
 	if err := initialModel.buildFileTree(); err != nil {
@@ -109,6 +113,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.rightViewport.Width = 2*m.windowSize.width/3 - 4
 		m.rightViewport.Height = m.windowSize.height - 2
 
+		m.help.Width = msg.Width
 		return m, tea.Batch(
 			m.updateTree(),
 			m.updateContent(),
@@ -136,6 +141,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.outputPath, cmd = m.outputPath.Update(msg)
 			return m, cmd
 		}
+
 		if m.showClipboardModal {
 			switch msg.String() {
 			case "y":
@@ -157,6 +163,11 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, nil
 			}
+		}
+
+		if key.Matches(msg, m.keys.Help) {
+			m.help.ShowAll = !m.help.ShowAll
+			return m, nil
 		}
 
 		switch msg.String() {

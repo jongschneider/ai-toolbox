@@ -76,10 +76,12 @@ func (m *model) View() string {
 		BorderForeground(lipgloss.Color("62")).
 		Padding(0)
 
-	// Render both panes
-	leftPane := treeStyle.Render(m.leftViewport.View())
-	rightPane := contentStyle.Render(m.rightViewport.View())
+	// // Render both panes
+	mainView := lipgloss.JoinHorizontal(lipgloss.Top,
+		treeStyle.Render(m.leftViewport.View()),
+		contentStyle.Render(m.rightViewport.View()),
+	)
 
-	// Join panes horizontally
-	return lipgloss.JoinHorizontal(lipgloss.Top, leftPane, rightPane)
+	// Add help view at the bottom
+	return fmt.Sprintf("%s\n%s", mainView, m.help.View(m.keys))
 }

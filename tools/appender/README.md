@@ -5,12 +5,9 @@ The goal is to capture the filename and contents of files in to feed into a prom
 
 ## TODO
 
-[] add help modal with keybindings
-    - [help](https://github.com/charmbracelet/bubbletea/tree/main/examples/help)
 [] add validation and don't select binaries
-[] add tests
-    - [teatest](https://github.com/charmbracelet/x/tree/main/exp/teatest)
-    - https://github.com/charmbracelet/bubbletea/blob/main/examples/simple/main_test.go
+[] add guards for copy and save - maybe help dialogue box
+[] add tests - [teatest](https://github.com/charmbracelet/x/tree/main/exp/teatest) - https://github.com/charmbracelet/bubbletea/blob/main/examples/simple/main_test.go
 [] add cohesive styling
 
 ## Expected Behavior
