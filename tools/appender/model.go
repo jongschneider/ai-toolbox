@@ -70,6 +70,7 @@ func (m *model) flattenTree() {
 	if m.removeHidden {
 		filters = append(filters, FilterHidden)
 	}
+	filters = append(filters, FilterBinary)
 	m.flatNodes = m.rootNode.flatten(m.nodeLookup, filters...)
 }
 
