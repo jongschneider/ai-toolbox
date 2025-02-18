@@ -5,8 +5,7 @@ The goal is to capture the filename and contents of files in to feed into a prom
 
 ## TODO
 
-[] add validation and don't select binaries
-[] add guards for copy and save - maybe help dialogue box
+[X] add validation and don't select binaries
 [] add tests - [teatest](https://github.com/charmbracelet/x/tree/main/exp/teatest) - https://github.com/charmbracelet/bubbletea/blob/main/examples/simple/main_test.go
 [] add cohesive styling
 
