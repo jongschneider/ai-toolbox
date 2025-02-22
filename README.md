@@ -147,4 +147,6 @@ Contributions are welcome! Please feel free to submit a Pull Request. Make sure 
 
 ## License
 
-[Add your chosen license here]
+This project is licensed under the MIT License - see the [LICENSE](./license.txt) file for details.
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
