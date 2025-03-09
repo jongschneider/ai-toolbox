@@ -22,12 +22,6 @@ func initFindInput() textarea.Model {
 
 // performFind executes a glob pattern search and stores matches.
 func (m *model) performFind() {
-	filters := make([]FilterFunc, 0)
-	if m.removeHidden {
-		filters = append(filters, FilterHidden)
-	}
-	filters = append(filters, FilterBinary)
-
 	pattern := m.findPattern.Value()
 	if pattern == "" {
 		m.matchedNodes = nil
@@ -35,45 +29,28 @@ func (m *model) performFind() {
 		return
 	}
 
-	// Ensure pattern is relative to workDir
+	// Create filters for matching
+	filters := make([]FilterFunc, 0)
+	if m.removeHidden {
+		filters = append(filters, FilterHidden)
+	}
+	filters = append(filters, FilterBinary)
+
+	// Instead of using doublestar.FilepathGlob directly,
+	// we'll walk the tree structure we already have and match against the pattern
 	searchPattern := filepath.Join(m.workDir, pattern)
 
-	matches, err := doublestar.FilepathGlob(searchPattern)
-	if err != nil {
-		slog.Error("Error in glob pattern", "pattern", searchPattern, "error", err)
-		m.matchedNodes = nil
-		m.currentMatchIdx = -1
-		return
-	}
+	slog.Info("Searching for pattern", "pattern", searchPattern, "workDir", m.workDir)
 
-	slog.Info(
-		"Searching for pattern",
-		"pattern",
-		searchPattern,
-		"workDir",
-		m.workDir,
-		"matches",
-		matches,
-	)
-	// Store matching nodes
-	m.matchedNodes = make([]*FileNode, 0, len(matches))
-	for _, match := range matches {
-		if node, ok := m.nodeLookup[match]; ok {
-			if !include(node, filters...) {
-				continue
-			}
+	// Reset matches
+	m.matchedNodes = make([]*FileNode, 0)
 
-			m.matchedNodes = append(m.matchedNodes, node)
-
-			// Ensure parent directories are expanded to show match
-			m.ensureNodeVisible(node)
-		}
-	}
+	// Use our existing tree structure to find matches
+	m.findMatchesInNode(m.rootNode, searchPattern, filters)
 
 	// Reset current match index
 	if len(m.matchedNodes) > 0 {
 		m.currentMatchIdx = 0
-
 		// Navigate to first match
 		m.navigateToMatch(0)
 	} else {
@@ -82,6 +59,31 @@ func (m *model) performFind() {
 
 	// Refresh the tree view
 	m.flattenTree()
+}
+
+// findMatchesInNode recursively finds nodes that match the pattern
+func (m *model) findMatchesInNode(node *FileNode, pattern string, filters []FilterFunc) {
+	// Skip this node if it doesn't pass the filters
+	if !include(node, filters...) {
+		return
+	}
+
+	// Check if this node matches the pattern
+	matched, err := doublestar.PathMatch(pattern, node.path)
+	if err == nil && matched {
+		m.matchedNodes = append(m.matchedNodes, node)
+		// Ensure parent directories are expanded to show match
+		m.ensureNodeVisible(node)
+	}
+
+	// Skip recursion if this is a directory that's filtered out (like .git)
+	if node.isDir {
+		// Only recurse into children if we're at the root (always check root)
+		// or if this directory passes all filters
+		for _, child := range node.children {
+			m.findMatchesInNode(child, pattern, filters)
+		}
+	}
 }
 
 // ensureNodeVisible expands all parent directories of a node.
