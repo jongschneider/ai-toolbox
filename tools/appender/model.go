@@ -15,6 +15,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
+	"github.com/charmbracelet/lipgloss"
 )
 
 type model struct {
@@ -35,6 +36,11 @@ type model struct {
 	outputPath         textarea.Model
 	keys               keyMap
 	help               help.Model
+	// Find mode related fields
+	inFindMode      bool
+	findPattern     textarea.Model
+	matchedNodes    []*FileNode
+	currentMatchIdx int
 }
 
 type windowSize struct {
@@ -112,6 +118,57 @@ func (m *model) collectSelectedFiles(node *FileNode, output *strings.Builder) {
 	}
 }
 
+// Add a new function to model.go that handles node display with highlighting.
+func (m *model) getNodeDisplay(node *FileNode) string {
+	// Start with the standard string representation
+	display := node.String()
+
+	// Check if this node is a match
+	isMatch := false
+	isCurrentMatch := false
+
+	for matchIdx, matchNode := range m.matchedNodes {
+		if node.path == matchNode.path {
+			isMatch = true
+			if matchIdx == m.currentMatchIdx {
+				isCurrentMatch = true
+			}
+			break
+		}
+	}
+
+	// Apply highlighting if it's a match
+	if isMatch {
+		// Extract the name part from the display string
+		parts := strings.Split(display, node.name)
+		prefix := parts[0]
+		suffix := ""
+		if len(parts) > 1 {
+			suffix = parts[1]
+		}
+
+		// Apply different highlighting based on match type
+		var highlightedName string
+		if isCurrentMatch {
+			// Current match gets a different highlight
+			highlightedName = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("205")).
+				Bold(true).
+				Render(node.name)
+		} else {
+			// Other matches get a lighter highlight
+			highlightedName = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("39")).
+				Render(node.name)
+		}
+
+		// Reconstruct the display string with highlighted name
+		display = prefix + highlightedName + suffix
+	}
+
+	return display
+}
+
 // Add this method to update content.
 func (m *model) updateContent() tea.Cmd {
 	buf := bytes.NewBuffer([]byte{})
@@ -139,11 +196,29 @@ const helpMsg = "\nPress space to select, l/h to expand/collapse directories, en
 
 func (m *model) updateTree() tea.Cmd {
 	var builder strings.Builder
+	// Add search input at top if in find mode
+	if m.inFindMode && m.findPattern.Focused() {
+		searchLabel := "Find: "
+
+		searchInfo := fmt.Sprintf("%s%s", searchLabel, m.findPattern.Value())
+		if len(m.matchedNodes) > 0 {
+			searchInfo += fmt.Sprintf(" (%d/%d matches)", m.currentMatchIdx+1, len(m.matchedNodes))
+		} else if m.findPattern.Value() != "" {
+			searchInfo += " (no matches)"
+		}
+
+		builder.WriteString(lipgloss.NewStyle().
+			Foreground(lipgloss.Color("205")).
+			Render(searchInfo) + "\n\n")
+	}
 
 	// Calculate the actual visible height
 	// Subtract help message height and borders/padding
 	helpLines := len(strings.Split(helpMsg, "\n"))
 	maxVisibleNodes := m.windowSize.height - helpLines - 2 // -2 for top/bottom borders
+	if m.inFindMode {
+		maxVisibleNodes -= 2 // Account for search line
+	}
 
 	// Ensure cursor stays within bounds
 	if m.cursor >= len(m.flatNodes) {
@@ -183,7 +258,8 @@ func (m *model) updateTree() tea.Cmd {
 	// Render visible nodes
 	for i := m.offset; i < end; i++ {
 		node := m.flatNodes[i]
-		line := node.String()
+		// Get the node display with potential highlighting
+		line := m.getNodeDisplay(node)
 		if i == m.cursor {
 			line = "> " + line
 		} else {
@@ -260,6 +336,29 @@ func (m *model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "end":
 		m.cursor = len(m.flatNodes) - 1
 		cmd = m.updateTree()
+
+	case "n":
+		// Allow n to work in normal mode (after find has been used)
+		if len(m.matchedNodes) > 0 {
+			m.nextMatch()
+			cmd = m.updateTree()
+		}
+
+	case "N":
+		// Allow N to work in normal mode (after find has been used)
+		if len(m.matchedNodes) > 0 {
+			m.prevMatch()
+			cmd = m.updateTree()
+		}
+
+	case "esc":
+		// ESC completely exits find mode and clears highlighting
+		m.inFindMode = false
+		m.findPattern.Reset()
+		m.findPattern.Blur()
+		m.matchedNodes = nil
+		m.currentMatchIdx = -1
+		return m, m.updateTree()
 	}
 
 	return m, cmd

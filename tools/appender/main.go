@@ -80,9 +80,13 @@ func main() {
 			2*w/3-4, // Width (adjusted for borders and padding)
 			h-4,     // Height (adjusted for borders and padding)
 		),
-		outputPath: txtArea,
-		keys:       keys,
-		help:       help.New(),
+		outputPath:      txtArea,
+		keys:            keys,
+		help:            help.New(),
+		findPattern:     initFindInput(),
+		inFindMode:      false,
+		matchedNodes:    []*FileNode{},
+		currentMatchIdx: -1,
 	}
 
 	if err := initialModel.buildFileTree(); err != nil {
@@ -99,10 +103,17 @@ func main() {
 	}
 }
 
-func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { //nolint:gocyclo
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
+	// Handle the pattern changed message in the Update function
+	case findPatternChangedMsg:
+		if m.inFindMode {
+			m.performFind()
+		}
+		return m, m.updateTree()
+
 	case tea.WindowSizeMsg:
 		m.windowSize.height = msg.Height - 4
 		m.windowSize.width = msg.Width
@@ -120,14 +131,56 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		)
 
 	case tea.KeyMsg:
+		// Handle keys in find mode
+		if m.inFindMode {
+			switch msg.String() {
+			case tea.KeyEsc.String():
+				// ESC completely exits find mode and clears highlighting
+				m.inFindMode = false
+				m.findPattern.Reset()
+				m.findPattern.Blur()
+				m.matchedNodes = nil
+				m.currentMatchIdx = -1
+				return m, m.updateTree()
+
+			case tea.KeyEnter.String():
+				// When Enter is pressed while the input is focused:
+				// 1. Perform the final search with current pattern
+				m.performFind()
+
+				// 2. Keep the pattern but unfocus the input field
+				m.findPattern.Blur()
+
+				// 3. Keep inFindMode false so we return to normal mode
+				m.inFindMode = false
+
+				// 3. Keep inFindMode true to preserve highlighting and n/N navigation
+
+				return m, m.updateTree()
+			}
+
+			// Only pass keypresses to the textarea if it's focused
+			if m.findPattern.Focused() {
+				var cmd tea.Cmd
+				m.findPattern, cmd = m.findPattern.Update(msg)
+
+				// Perform search on each keypress for real-time results
+				return m, tea.Batch(cmd, func() tea.Msg {
+					m.performFind()
+					return findPatternChangedMsg{}
+				})
+			}
+
+			return m, nil
+		}
 		if m.showSaveModal {
 			switch msg.String() {
-			case "esc":
+			case tea.KeyEsc.String():
 				m.showSaveModal = false
 				m.outputPath.Reset()
 				m.outputPath.SetValue("output.txt")
 				return m, nil
-			case "enter":
+			case tea.KeyEnter.String():
 				f, err := os.Create(m.outputPath.Value())
 				if err != nil {
 					slog.Error("Failed to create file", "error", err)
@@ -152,7 +205,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				m.showClipboardModal = false
 				return m, tea.Quit
-			case "n", "esc":
+			case "n", tea.KeyEsc.String():
 				m.showClipboardModal = false
 				m.clipboardError = nil
 				return m, nil
@@ -171,6 +224,19 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		switch msg.String() {
+		case "/":
+			if !m.showSaveModal && !m.showClipboardModal {
+				m.inFindMode = true
+				m.findPattern.Reset()
+				m.findPattern.Focus()
+				m.matchedNodes = nil
+				m.currentMatchIdx = -1
+
+				// Immediately update the tree to show the search bar
+				return m, m.updateTree()
+			}
+			fallthrough
+
 		case "ctrl+c", "q":
 			return m, tea.Quit
 
@@ -180,7 +246,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		// Navigation keys are handled by handleKeyPress
-		case "up", "k", "down", "j", "pgup", "pgdown", "home", "end":
+		case "up", "k", "down", "j", "pgup", "pgdown", "home", "end", "n", "N", tea.KeyEsc.String():
 			return m.handleKeyPress(msg)
 
 		// Right viewport scrolling
@@ -227,7 +293,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.removeHidden = !m.removeHidden
 			m.flattenTree()
 			return m, m.updateTree()
-		case "enter":
+		case tea.KeyEnter.String():
 			if !m.showSaveModal {
 				m.showSaveModal = true
 				m.outputPath.Focus()
@@ -243,3 +309,6 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	return m, tea.Batch(cmd, leftViewportCmd, rightViewportCmd)
 }
+
+// Add a custom message type for pattern changes.
+type findPatternChangedMsg struct{}
