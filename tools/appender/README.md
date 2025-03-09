@@ -1,146 +1,137 @@
 # Appender
 
-Appender is a CLI tool designed to make interacting with Chat LLMs like Claude.ai easier when writing code.
-The goal is to capture the filename and contents of files in to feed into a prompt in order to give the current state of the codebase we are working in.
+Appender is a terminal-based file explorer and content collector tool that allows you to navigate your filesystem, select files, and export their content into a single file or to the clipboard.
 
-## TODO
+## Features
 
-[X] add validation and don't select binaries
-[] add tests - [teatest](https://github.com/charmbracelet/x/tree/main/exp/teatest) - https://github.com/charmbracelet/bubbletea/blob/main/examples/simple/main_test.go
-[] add cohesive styling
+- Interactive file explorer with tree view
+- File selection and preview
+- Hidden files toggling
+- Content export to file or clipboard
+- File search with glob pattern support
+- Keyboard-driven navigation
 
-## Expected Behavior
+## Installation
 
-1. cli
-
-```sh
-$ appender
+```bash
+go install github.com/jongschneider/ai-toolbox/tools/appender@latest
 ```
 
-    - when called from the command line without any arguments, `appender` will assume that the `workDir` is the current working directory
-    - if called with an argument, appender will use the path as the `workDir`
+Or build from source:
 
-```sh
-$ appender ./path/to/dir
+```bash
+git clone https://github.com/jongschneider/ai-toolbox.git
+cd ai-toolbox/tools/appender
+go build
 ```
 
-2. the output of the cli will be the directory tree
+## Usage
 
-```sh
-$ appender
-.
-├── README.md
-├── flake.lock
-├── flake.nix
-├── go.mod
-├── go.work
-├── go.work.sum
-├── justfile
-├──+ tools
-│   └─+ appender
-│       ├── README.md
-│       ├── go.mod
-│       ├── go.sum
-│       └── main.go
-└── vendor
+```bash
+appender [directory]
 ```
 
-3. The user should be able to navigate up and down each line using `j` and `k` and select the line using `space`. If a file is selected, it should have a  added to the end of the line like the following (assume README.md was selected using the `space` key):
+If no directory is specified, the current directory will be used.
 
-```sh
-$ appender
-.
-├── README.md 
-├── flake.lock
-├── flake.nix
-├── go.mod
-├── go.work
-├── go.work.sum
-├── justfile
-├──+ tools
-│   └─+ appender
-│       ├── README.md
-│       ├── go.mod
-│       ├── go.sum
-│       └── main.go
-└── vendor
+### Configuration
+
+Configuration is handled through environment variables and command-line flags:
+
+- `APPENDER_LOGGING`: Set logging level (1=DEBUG, 2=INFO, 3=WARN, 4=ERROR)
+- `-l, --logging`: Alternative way to set logging level via command line
+
+Example:
+```bash
+APPENDER_LOGGING=2 appender ./my-project
+# Or using flags
+appender -l 2 ./my-project
 ```
 
-4. If a directory is selected, then the directory and all files and folders within the directory should have a  added to the end of the line like the following (assume tools was selected using the `space` key):
+## Controls
 
-```sh
-$ appender
-.
-├── README.md
-├── flake.lock
-├── flake.nix
-├── go.mod
-├── go.work
-├── go.work.sum
-├── justfile
-├──+ tools 
-│   └─+ appender 
-│       ├── README.md 
-│       ├── go.mod 
-│       ├── go.sum 
-│       └── main.go 
-└── vendor
+### Basic Navigation
+- `↑/k`: Move cursor up
+- `↓/j`: Move cursor down
+- `l`: Expand directory
+- `h`: Collapse directory
+- `Home`: Jump to top
+- `End`: Jump to bottom
+- `PgUp`: Move cursor up one page
+- `PgDown`: Move cursor down one page
+
+### File Operations
+- `Space`: Select/deselect file or directory
+- `Enter`: Save selected files to output file
+- `c`: Copy selected files to clipboard
+- `.`: Toggle hidden files
+- `q` or `Ctrl+C`: Quit application
+
+### Search Operations
+- `/`: Enter search mode
+- `Enter` (in search mode): Execute search and exit search mode
+- `Esc` (in search mode): Exit search mode
+- `n`: Navigate to next match
+- `N`: Navigate to previous match
+
+### Content Viewing
+- `K`: Scroll preview pane up 
+- `J`: Scroll preview pane down
+- `g`: Scroll preview pane to top
+- `G`: Scroll preview pane to bottom
+
+### Help
+- `?`: Toggle help view
+
+## Search Functionality
+
+The search feature uses glob patterns to find files and directories in your workspace:
+
+- Type `/` to enter search mode
+- Enter a glob pattern (e.g., `*.go`, `**/*.md`)
+- Press `Enter` to execute the search
+- Use `n` and `N` to navigate between matches
+- Press `Esc` to clear search results
+
+Glob patterns support:
+- `*`: Matches any sequence of characters in a filename
+- `**`: Matches any sequence of directories 
+- `?`: Matches any single character
+- `[abc]`: Matches any of the characters in brackets
+- `[!abc]`: Matches any character not in brackets
+
+Examples:
+- `*.go`: All Go files in the current directory
+- `**/*.go`: All Go files in any subdirectory
+- `cmd/*/main.go`: All main.go files one level under the cmd directory
+- `[a-c]*/`: All directories starting with a, b, or c
+
+The search respects your hidden files setting, so `.git` directories will be excluded when hidden files are toggled off.
+
+## Output Format
+
+The output file will contain the content of all selected files, with each file's content preceded by a comment line containing the file path.
+
+Example:
 ```
-
-5. Lines with 󱞣 indicate a directory that is expanded. That will be the default. If the user presses `l` or `h` key on a line with a directory, then the 󱞣 will turn into  and all of the directories and files within that directory will disappear. Pressing `l` or `h` key will toggle them back into view and return the  to 󱞣 (see the vendor line as a directory that is not in expanded mode):
-
-```sh
-$ appender
-.
-├── README.md
-├── flake.lock
-├── flake.nix
-├── go.mod
-├── go.work
-├── go.work.sum
-├── justfile
-├──+ tools 
-│   └─+ appender 
-│       ├── README.md 
-│       ├── go.mod 
-│       ├── go.sum 
-│       └── main.go 
-└── vendor
-```
-
-6. When the user presses `enter` key, the program will register the selected files and create a new file called `output.txt` that includes each selected file along with it's relative path in a comment.
-
-```sh
-$ appender
-.
-├── README.md
-├── flake.lock
-├── flake.nix
-├── go.mod
-├── go.work
-├── go.work.sum
-├── justfile
-├──+ tools 
-│   └─+ appender 
-│       ├── README.md 
-│       └── main.go 
-└── vendor
-```
-
-Will produce a file called `output.txt` with the following contents:
-
-```txt
-# tools/appender/README.md
-This is some text
-    * Bullet 1
-    * Bullet #2
-
-# tools/appender/main.go
+# path/to/file1.go
 package main
 
-import "fmt"
+func main() {
+    // ...
+}
 
-func main(){
-    fmt.Println("Hello, World!")
+# path/to/file2.go
+package utils
+
+func Utility() {
+    // ...
 }
 ```
+
+## Filtering
+
+Appender automatically filters binary files and can toggle the visibility of hidden files (files and directories starting with `.`).
+
+## Troubleshooting
+
+Logs are written to `./logs/debug.log` when logging is enabled. Increase the logging level for more detailed information.
