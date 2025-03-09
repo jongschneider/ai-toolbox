@@ -31,6 +31,10 @@ lint-all:
 clean:
     rm -rf result
 
+# Update flake.lock
+update:
+    nix flake update
+
 # Run pre-commit hooks
 pre-commit:
     nix develop --command bash -c 'pre-commit run --all-files'
