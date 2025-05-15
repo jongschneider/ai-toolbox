@@ -28,7 +28,10 @@
         buildTool = name:
           pkgs.buildGoModule {
             inherit name;
-            src = ./.;
+            src = builtins.path {
+              path = ./.;
+              name = "source";
+            };
             subPackages = ["tools/${name}"];
             # First try with vendorHash = null to get the correct hash
             # vendorHash = ""; # update whenever go.mod changes
